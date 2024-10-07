@@ -1,0 +1,9 @@
+[submodule "slicer/slicer/nanosvg"]
+	path = slicer/slicer/nanosvg
+	url = git@github.com:memononen/nanosvg.git
+[submodule "slicer/nanosvg"]
+	path = slicer/nanosvg
+	url = git@github.com:memononen/nanosvg.git
+[submodule "slicer/raygui"]
+	path = slicer/raygui
+	url = git@github.com:raysan5/raygui.git
