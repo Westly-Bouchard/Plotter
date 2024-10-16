@@ -15,7 +15,15 @@ FetchContent_Declare(
         GIT_PROGRESS TRUE
 )
 
+#FetchContent_Declare(
+#        serial
+#        GIT_REPOSITORY "https://github.com/wjwwood/serial.git"
+#        GIT_TAG "main"
+#        GIT_PROGRESS TRUE
+#)
+
 FetchContent_MakeAvailable(raylib)
+#FetchContent_MakeAvailable(serial)
 
 add_executable(slicer main.cpp)
 target_link_libraries(slicer PRIVATE raylib)
