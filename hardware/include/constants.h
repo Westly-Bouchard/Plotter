@@ -17,9 +17,11 @@ constexpr unsigned int Y_AXIS_MAX_SPEED = 1000;
 constexpr unsigned short int MOTOR_ENABLE_PIN = PIN7;
 
 /*** CONTROL WORDS ***/
-constexpr unsigned char DISABLED = 0x44;
+constexpr unsigned char HANDSHAKE = 0x48;
 
-constexpr unsigned char JOG = 0x4A;
+constexpr unsigned char MODE_DISABLED = 0x44;
+
+constexpr unsigned char MODE_JOG = 0x4A;
 
 constexpr unsigned char ENABLE = 0x45;
 
