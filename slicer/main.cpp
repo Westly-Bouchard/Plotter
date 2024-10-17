@@ -21,6 +21,10 @@
  *
  * Using: nanosvg and nanosvgrast
  */
+
+#define NANOSVG_IMPLEMENTATION
+#define NANOSVGRAST_IMPLEMENTATION
+
 #include "nanosvg/src/nanosvg.h"
 #include "nanosvg/src/nanosvgrast.h"
 
@@ -58,23 +62,17 @@ int main() {
     // GUI Setup
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "It's Ambitious");
 
-    // Initial window position
-    const Vector2 windowPosition = { SCREEN_WIDTH / 2 - 200 / 2, SCREEN_HEIGHT / 2 - 465 / 2 };
-
     // Load built in blue color scheme
     GuiLoadStyleBluish();
 
+    // Try to run at 60 fps if possible
     SetTargetFPS(60);
-
-    bool btnLoadPressed = false;
-
-    bool imageLoaded = false;
 
     // Container for image texture data
     Texture2D texture = { 0 };
 
-    // Container for rendered image data
-    void* img;
+    // Container for parsed vectors
+    NSVGimage* image;
 
     // GUI Mainloop
     while (!WindowShouldClose()) {
@@ -89,30 +87,89 @@ int main() {
             // If the user correctly dropped ONE .svg file onto the window, we can proceed
             if ((droppedFiles.count == 1) && IsFileExtension(droppedFiles.paths[0], ".svg")) {
                 // Load the vector data
-                NSVGimage * image;
+                image = nsvgParseFromFile(droppedFiles.paths[0], "px", 96.0);
 
-                image = nsvgParseFromFile(droppedFiles.paths[0], "px", 96);
+                /*
+                 * Have to reimplement the raylib svg loading code b/c it got removed
+                 * So stupid.
+                 */
+                // Create raylib image object
+                Image raylibImage = { nullptr };
 
-                // Have to actually render the image to show a preview in the window
-                struct NSVGrasterizer* rast = nsvgCreateRasterizer();
+                // Instantiate rasterizer
+                struct NSVGrasterizer *rast = nsvgCreateRasterizer();
 
-                // Allocate memory for the image itself
-                img = malloc(100 * 100 * 4);
+                // Allocate space for rasterized image data
+                void* img = malloc(image->width * image->height * 4);
 
-                // Rasterize the image
-                nsvgRasterize(rast, image, 0, 0, 1, static_cast<unsigned char*>(img), 100, 100, 400);
+                // Make the call to rasterize the vectors
+                nsvgRasterize(
+                        rast,
+                        image,
+                        0,
+                        0,
+                        1,
+                        static_cast<unsigned char*>(img),
+                        image->width,
+                        image->height,
+                        image->width * 4
+                );
 
-                Image raylibImage = LoadImageFromMemory()
+                // Populate raylib image object with rasterized data
+                raylibImage.data = img;
+                raylibImage.width = image->width;
+                raylibImage.height = image->height;
+                raylibImage.mipmaps = 1;
+                raylibImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+
+                // Clean up rasterizer when we're done with it
+                nsvgDeleteRasterizer(rast);
+
+                // Create the texture to render to the gui later
+                texture = LoadTextureFromImage(raylibImage);
+
+                // Always clean up resources when you're done using them
+                UnloadImage(raylibImage);
             }
 
+            // Always clean up resources when you're done with them
             UnloadDroppedFiles(droppedFiles);
         }
 
         BeginDrawing();
 
+        ClearBackground(GetColor(GuiGetStyle(0, 19)));
+
+        // If we have a texture (image) loaded
+        if (texture.id != 0) {
+            // Render it to the screen
+            Vector2 position = {
+                    static_cast<float>((SCREEN_WIDTH - texture.width) / 2.),
+                    static_cast<float>((SCREEN_HEIGHT - texture.height) / 2.)
+            };
+            DrawTextureEx(texture, position, 0, 1, WHITE);
+
+        // If we don't have a texture (image) loaded
+        } else {
+            // Prompt the user to drag and drop an image onto the application
+            DrawText(
+                    "Drag & drop an SVG image file",
+                    SCREEN_WIDTH / 2 - 200,
+                    SCREEN_HEIGHT / 2 - 15,
+                    30,
+                    GetColor(GuiGetStyle(0, 18))
+                    );
+        }
+
         EndDrawing();
     }
 
+    // Clean up texture if loaded
+    if (texture.id != 0) {
+        UnloadTexture(texture);
+    }
+
+    // Close raylib window
     CloseWindow();
 
 //    closeSerialPort(fd);
