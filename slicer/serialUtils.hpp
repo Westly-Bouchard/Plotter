@@ -11,6 +11,20 @@
 #include <termios.h>
 #include <unistd.h>
 
+struct Curve {
+    double cp1x;
+    double cp1y;
+
+    double cp2x;
+    double cp2y;
+
+    double cp3x;
+    double cp3y;
+
+    double cp4x;
+    double cp4y;
+};
+
 int openSerialPort(const char* portName) {
     int fd = open(portName, O_RDWR | O_NOCTTY | O_SYNC);
     if (fd < 1) {
@@ -63,6 +77,10 @@ int writeToSerialPort(int fd, const char *buffer, size_t size) {
     return write(fd, buffer, size);
 }
 
+int writeToSerialPort(int fd, uint8_t *buffer, size_t size) {
+    return write(fd, buffer, size);
+}
+
 void closeSerialPort(int fd) { close(fd); }
 
 // Example reference for how to read from the serial port
@@ -96,11 +114,19 @@ public:
         return true;
     }
 
-    int writeChar(char ctrl) {
+    void close() const {
+            closeSerialPort(fd);
+    }
+
+    [[nodiscard]] int writeChar(char ctrl) const {
         return writeToSerialPort(fd, &ctrl, 1);
     }
 
-    int getFD() const { return fd; }
+    [[nodiscard]] int writeCurve(Curve curve) const {
+        return writeToSerialPort(fd, (uint8_t *)&curve, sizeof(curve));
+    }
+
+    [[nodiscard]] int getFD() const { return fd; }
 };
 
 #endif //SLICER_SERIALUTILS_H

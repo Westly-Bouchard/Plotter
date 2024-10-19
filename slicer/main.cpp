@@ -48,6 +48,7 @@ const int SCREEN_HEIGHT = 800;
 const char ENABLE_CTRL_WORD = 'e';
 const char DISABLE_CTRL_WORD = 'd';
 const char READY_RESPONSE = 'r';
+const char NEXT_CURVE = 'n';
 
 enum State {
     IDLE,
@@ -55,19 +56,6 @@ enum State {
     RUNNING,
 };
 
-struct Curve {
-    double cp1x;
-    double cp1y;
-
-    double cp2x;
-    double cp2y;
-
-    double cp3x;
-    double cp3y;
-
-    double cp4x;
-    double cp4y;
-};
 
 void dbgPrintVectors(NSVGimage* image);
 
@@ -84,22 +72,7 @@ int main() {
     State currentState = State::IDLE;
     State previousState = State::IDLE;
 
-//    // For now this will just be hardcoded
-//    const char* portName = "/dev/cu.usbmodem1301";
-//
-//    // Open connection to Arduino and check for failure
-//    int fd = openSerialPort(portName);
-//
-//    if (fd < 0) {
-//        return 1;
-//    }
-//
-//    // Configure for correct communication protocol
-//    if (!configureSerialPort(fd, B9600)) {
-//        closeSerialPort(fd);
-//        return 1;
-//    }
-
+    // Create and open serial connection
     SerialConnection conn("/dev/cu.usbmodem1301");
 
     if (!conn.open()) {
@@ -123,6 +96,8 @@ int main() {
     bool stopButtonPressed = false;
 
     bool awaitReady = false;
+
+    bool awaitNextCurve = false;
 
     // Container for parsed vectors
     NSVGimage* image = nullptr;
@@ -171,6 +146,9 @@ int main() {
                     if (response == READY_RESPONSE) {
                         previousState = currentState;
                         currentState = State::RUNNING;
+
+                        awaitReady = false;
+                        break;
                     }
                 }
             }
@@ -178,14 +156,42 @@ int main() {
 
             case RUNNING: {
                 // E-Stop can be triggered by pressing the button or by hitting the space bar
-                if (stopButtonPressed || IsKeyPressed(KEY_SPACE)) {
+                if (stopButtonPressed || IsKeyPressed(KEY_SPACE) || curveBuffer.empty()) {
 
                     conn.writeChar(DISABLE_CTRL_WORD);
 
+                    awaitNextCurve = false;
+
                     previousState = currentState;
                     currentState = State::IDLE;
+                    break;
 
-                    awaitReady = false;
+                // If this is the first iteration in the run state
+                } else if (previousState == State::IMAGE_LOADED){
+
+                    conn.writeCurve(curveBuffer.front());
+
+                    curveBuffer.pop();
+
+                    awaitNextCurve = true;
+
+                    previousState = State::RUNNING;
+
+                }
+
+                if (awaitNextCurve) {
+                    char response;
+
+                    readFromSerialPort(conn.getFD(), &response, 1);
+
+                    cout << "DBG: Response " << response << endl;
+
+                    if (response == NEXT_CURVE) {
+
+                        conn.writeCurve(curveBuffer.front());
+
+                        curveBuffer.pop();
+                    }
                 }
             }
             break;
@@ -262,7 +268,7 @@ int main() {
     // Close raylib window
     CloseWindow();
 
-//    closeSerialPort(fd);
+    conn.close();
 
     return 0;
 
