@@ -45,6 +45,10 @@ using namespace std;
 const int SCREEN_WIDTH = 1200;
 const int SCREEN_HEIGHT = 800;
 
+const char ENABLE_CTRL_WORD = 'e';
+const char DISABLE_CTRL_WORD = 'd';
+const char READY_RESPONSE = 'r';
+
 enum State {
     IDLE,
     IMAGE_LOADED,
@@ -96,6 +100,12 @@ int main() {
 //        return 1;
 //    }
 
+    SerialConnection conn("/dev/cu.usbmodem1301");
+
+    if (!conn.open()) {
+        return 1;
+    }
+
     // GUI Setup
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "It's Ambitious");
 
@@ -111,6 +121,8 @@ int main() {
     bool startButtonPressed = false;
 
     bool stopButtonPressed = false;
+
+    bool awaitReady = false;
 
     // Container for parsed vectors
     NSVGimage* image = nullptr;
@@ -138,10 +150,28 @@ int main() {
             // If we have an image loaded, we're looking for the user to give input to run the file
             case IMAGE_LOADED: {
                 if (startButtonPressed) {
-                    previousState = currentState;
-                    currentState = State::RUNNING;
+
 
                     populateCurveBuffer(image, curveBuffer);
+
+                    // Send control word to Arduino
+                    conn.writeChar(ENABLE_CTRL_WORD);
+
+                    // Await ready response
+                    awaitReady = true;
+                }
+
+                if (awaitReady) {
+                    char response;
+
+                    readFromSerialPort(conn.getFD(), &response, 1);
+
+                    cout << "DBG: Response " << response << endl;
+
+                    if (response == READY_RESPONSE) {
+                        previousState = currentState;
+                        currentState = State::RUNNING;
+                    }
                 }
             }
             break;
@@ -149,8 +179,13 @@ int main() {
             case RUNNING: {
                 // E-Stop can be triggered by pressing the button or by hitting the space bar
                 if (stopButtonPressed || IsKeyPressed(KEY_SPACE)) {
+
+                    conn.writeChar(DISABLE_CTRL_WORD);
+
                     previousState = currentState;
                     currentState = State::IDLE;
+
+                    awaitReady = false;
                 }
             }
             break;

@@ -74,4 +74,33 @@ void closeSerialPort(int fd) { close(fd); }
 //        cout << "Read form serial port: " << string(buffer, n) << endl;
 //    }
 
+class SerialConnection {
+private:
+    int fd;
+    const char* portName;
+
+public:
+    explicit SerialConnection(const char* portName) {
+        this->portName = portName;
+
+        fd = -1;
+    }
+
+    bool open() {
+        fd = openSerialPort(portName);
+
+        if (fd < 0 || !configureSerialPort(fd, B9600)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    int writeChar(char ctrl) {
+        return writeToSerialPort(fd, &ctrl, 1);
+    }
+
+    int getFD() const { return fd; }
+};
+
 #endif //SLICER_SERIALUTILS_H
