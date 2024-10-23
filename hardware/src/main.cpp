@@ -7,11 +7,36 @@
 // long positions2[2] = {0, 0};
 
 enum State {
-  IDLE,
   DISABLED,
-  JOG,
   ENABLED
 };
+
+struct Curve {
+    double cp1x;
+    double cp1y;
+
+    double cp2x;
+    double cp2y;
+
+    double cp3x;
+    double cp3y;
+
+    double cp4x;
+    double cp4y;
+};
+
+const size_t IMAGE_DESC_SIZE = 16;
+
+struct ImageDesc {
+  double width;
+  double height;
+};
+
+ImageDesc img;
+
+bool needImageDesc = false;
+
+Curve currentCurve;
 
 Gantry gantry;
 
@@ -24,8 +49,8 @@ void setup() {
   gantry = Gantry();
 
   // Setup state machine
-  currentState = IDLE;
-  previousState = IDLE;
+  currentState = DISABLED;
+  previousState = DISABLED;
 
   Serial.begin(9600);
 
@@ -34,30 +59,10 @@ void setup() {
   digitalWrite(7, LOW);
 }
 
-String input;
+char input;
 
 void loop() {
-  // switch (currentState) {
-  //   case IDLE: {
 
-  //   }
-  //   break;
-
-  //   case DISABLED: {
-
-  //   }
-  //   break;
-
-  //   case JOG: {
-
-  //   }
-  //   break;
-
-  //   case ENABLED: {
-
-  //   }
-  //   break;
-  // }
   // gantry.moveTo(positions1);
   // gantry.runSpeedToPosition();
 
@@ -68,21 +73,66 @@ void loop() {
 
   // delay(1000);
 
-  if (Serial.available()) {
-    input = Serial.readString();
-    Serial.write(input.c_str());
-    if (input == "e") {
+  switch (currentState) {
+    case State::DISABLED: {
+      
+      // If the plotter has just been disabled, make sure to disable the stepper motors
+      if (previousState == State::ENABLED) {
+        gantry.disableSteppers();
 
-      digitalWrite(7, HIGH);
+        digitalWrite(7, LOW);
 
-      delay(2000);
+        previousState = currentState;
+      }
 
-      digitalWrite(7, LOW);
+      // Check for control word from slicer
+      if (Serial.available() == 1) {
+        Serial.readBytes(&input, 1);
 
+        if (input == ENABLE_WORD) {
+          previousState = currentState;
+          currentState = State::ENABLED;
+        }
+      }
     }
+    break;
 
-    // if (input == "e") {
-    //   digitalWrite(LED_BUILTIN, HIGH); 
-    // }
- }
+    case State::ENABLED: {
+      // If this is the first run of the enable logic
+      if (previousState == State::DISABLED) {
+        digitalWrite(7, HIGH);
+
+        gantry.enableSteppers();
+
+        previousState = currentState;
+
+        Serial.write(READY_RESPONSE);
+
+        needImageDesc = true;
+      }
+
+      // If we receive a control word
+      if (Serial.available() == 1) {
+          Serial.readBytes(&input, 1);
+
+          if (input == DISABLE_WORD) {
+            previousState = currentState;
+            currentState = State::DISABLED;
+          }
+      }
+
+      if (needImageDesc && Serial.available() >= IMAGE_DESC_SIZE) {
+        char buf[IMAGE_DESC_SIZE];
+
+        Serial.readBytes(buf, IMAGE_DESC_SIZE);
+
+        memcpy(&img, &buf, IMAGE_DESC_SIZE);
+
+        needImageDesc = false;
+      }
+
+      
+    }
+    break;
+  }
 }

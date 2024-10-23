@@ -21,4 +21,8 @@ class Gantry {
         void enableSteppers();
 
         void disableSteppers();
+
+        void setTargetPosition(double x, double y);
+
+        bool takeMovementStep();
 };
